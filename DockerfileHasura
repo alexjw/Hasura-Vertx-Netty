@@ -1,0 +1,8 @@
+FROM hasura/graphql-engine:v2.9.0
+
+COPY hasura_metadata.json /hasura-metadata/hasura_metadata.json
+
+# -e HASURA_GRAPHQL_DATABASE_URL=postgres://user:password@host.docker.internal:5433/db \
+  #  -e HASURA_GRAPHQL_ENABLE_CONSOLE=true \
+  #  -e HASURA_GRAPHQL_ADMIN_SECRET=secret \
+  # Map port to 8081

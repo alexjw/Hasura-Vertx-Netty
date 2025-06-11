@@ -1,0 +1,11 @@
+FROM postgres:17
+
+ENV POSTGRES_USER=user
+ENV POSTGRES_PASSWORD=password
+ENV POSTGRES_DB=db
+
+COPY init-db.sql /docker-entrypoint-initdb.d/
+
+# Remember to expose the port 5432 to 5433
+
+CMD ["postgres"]
