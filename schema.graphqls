@@ -1,0 +1,9 @@
+# For a custom Resolver, pending
+type Query {
+    appendHeroToUsername(playerId: Int!): UsernameOutput
+}
+
+type UsernameOutput {
+    playerId: Int!
+    modifiedUsername: String!
+}
