@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 
+import java.util.Map;
+
 
 // Actions example
 @RestController
@@ -28,7 +30,7 @@ public class RankController {
     @PostMapping("/api/rank")
     public ResponseEntity<PlayerRankOutput> calculatePlayerRank(
             @RequestHeader(value = "x-hasura-admin-secret", required = false) String adminSecret,
-            @RequestBody PlayerRankInput input) {
+            @RequestBody Map<String, Object> input) {
 
         //System.out.println("Received payload: {}" + input);
         //System.out.println("Player ID: {}" + input.getPlayerId());
@@ -39,7 +41,7 @@ public class RankController {
         }
 
         // Query Hasura for player data
-        String query = "{\"query\": \"query { player_battle_summary(where: {player_id: {_eq: " + input.getPlayerId() + "}}) { username total_score } }\"}";
+        String query = "{\"query\": \"query { player_battle_summary(where: {player_id: {_eq: " + input.get("playerId") + "}}) { username total_score } }\"}";
         String response = restClient.post()
                 .uri(hasuraEndpoint)
                 .header("x-hasura-admin-secret", hasuraAdminSecret)
@@ -55,7 +57,7 @@ public class RankController {
         String rank = calculateRank(totalScore);
 
         // Return output
-        PlayerRankOutput output = new PlayerRankOutput(input.getPlayerId(), username, totalScore, rank);
+        PlayerRankOutput output = new PlayerRankOutput((Integer) input.get("playerId"), username, totalScore, rank);
         return ResponseEntity.ok(output);
     }
 
@@ -73,37 +75,6 @@ public class RankController {
     private int extractTotalScore(String response) {
         // Simplified parsing, use Jackson in production
         return Integer.parseInt(response.split("\"total_score\":")[1].split("}")[0]);
-    }
-}
-
-// Input and output classes
-class PlayerRankInput {
-    private Input input;
-
-    public void setInput(Input input) {
-        this.input = input;
-    }
-
-    public int getPlayerId() {
-        return input != null ? input.getPlayerId() : 0;
-    }
-
-    @Override
-    public String toString() {
-        return "PlayerRankInput{input=" + input + "}";
-    }
-}
-
-class Input {
-    private int playerId;
-
-    public int getPlayerId() {
-        return playerId;
-    }
-
-    @Override
-    public String toString() {
-        return "Input{playerId=" + playerId + "}";
     }
 }
 

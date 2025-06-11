@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS players;
 DROP TABLE IF EXISTS vehicles;
 DROP TABLE IF EXISTS vehicle_types;
 DROP TABLE IF EXISTS nations;
+DROP VIEW IF EXISTS player_battle_summary;
 
 -- Create tables
 CREATE TABLE nations (
@@ -32,7 +33,8 @@ CREATE TABLE vehicles (
 CREATE TABLE players (
                          id SERIAL PRIMARY KEY,
                          username VARCHAR(50) UNIQUE NOT NULL,
-                         level INTEGER NOT NULL DEFAULT 1
+                         level INTEGER NOT NULL DEFAULT 1,
+                         looking_for_battle BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE player_vehicles (
@@ -68,7 +70,7 @@ CREATE TABLE squadron_members (
                                   PRIMARY KEY (squadron_id, player_id)
 );
 
--- Insert sample data
+-- Insert sample data for nations, vehicle_types, and vehicles
 INSERT INTO nations (name) VALUES ('USA'), ('Germany'), ('USSR');
 
 INSERT INTO vehicle_types (type) VALUES ('tank'), ('plane'), ('ship');
@@ -84,22 +86,38 @@ INSERT INTO vehicles (name, nation_id, type_id, tier) VALUES
                                                           ('Yak-3', 3, 2, 4),
                                                           ('Sovetsky Soyuz', 3, 3, 5);
 
-INSERT INTO players (username, level) VALUES
-                                          ('AcePilot', 10),
-                                          ('TankCommander', 8),
-                                          ('NavalHero', 7),
-                                          ('Rookie', 1);
+-- Insert 100 players with unique usernames and levels
+INSERT INTO players (username, level, looking_for_battle)
+SELECT 'Player' || i, (i % 10) + 1, TRUE
+FROM generate_series(1, 100) AS i;
 
-INSERT INTO player_vehicles (player_id, vehicle_id) VALUES
-                                                        (1, 2), (1, 5),
-                                                        (2, 1), (2, 4),
-                                                        (3, 3), (3, 6),
-                                                        (4, 7);
+-- Assign vehicles to players (each player gets 1-3 random vehicles)
+INSERT INTO player_vehicles (player_id, vehicle_id)
+SELECT p.id, v.id
+FROM players p
+         CROSS JOIN LATERAL (
+    SELECT id FROM vehicles ORDER BY random() LIMIT (1 + (random() * 2)::integer)
+    ) v;
 
+-- Create 5 squadrons with random leaders
+INSERT INTO squadrons (name, leader_id)
+SELECT 'Squadron' || i, (SELECT id FROM players ORDER BY random() LIMIT 1)
+FROM generate_series(1, 5) AS i;
+
+-- Assign players to squadrons (each squadron gets 5-10 random members)
+INSERT INTO squadron_members (squadron_id, player_id)
+SELECT s.id, p.id
+FROM squadrons s
+         CROSS JOIN LATERAL (
+    SELECT id FROM players ORDER BY random() LIMIT (5 + (random() * 5)::integer)
+    ) p;
+
+-- Insert sample battles
 INSERT INTO battles (mode, start_time, duration) VALUES
                                                      ('arcade', '2025-06-10 14:00:00', '00:15:00'),
                                                      ('realistic', '2025-06-10 15:00:00', '00:20:00');
 
+-- Insert sample battle participants
 INSERT INTO battle_participants (battle_id, player_id, team, score) VALUES
                                                                         (1, 1, 'allies', 500),
                                                                         (1, 2, 'axis', 300),
@@ -107,11 +125,7 @@ INSERT INTO battle_participants (battle_id, player_id, team, score) VALUES
                                                                         (2, 1, 'allies', 700),
                                                                         (2, 3, 'axis', 400);
 
-INSERT INTO squadrons (name, leader_id) VALUES ('Flying Aces', 1);
-
-INSERT INTO squadron_members (squadron_id, player_id) VALUES (1, 1), (1, 3);
-
-
+-- Create view for player battle summary
 CREATE VIEW player_battle_summary AS
 SELECT
     p.id AS player_id,
