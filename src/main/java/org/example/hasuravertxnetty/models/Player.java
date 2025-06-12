@@ -8,6 +8,14 @@ import lombok.Setter;
 @Entity
 @Table(name = "players")
 public class Player {
+    public Integer getId() {
+        return id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;

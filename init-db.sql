@@ -51,11 +51,11 @@ CREATE TABLE battles (
 );
 
 CREATE TABLE battle_participants (
+                                     id SERIAL PRIMARY KEY,
                                      battle_id INTEGER REFERENCES battles(id),
                                      player_id INTEGER REFERENCES players(id),
                                      team VARCHAR(20) NOT NULL,
-                                     score INTEGER NOT NULL DEFAULT 0,
-                                     PRIMARY KEY (battle_id, player_id)
+                                     score INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE squadrons (

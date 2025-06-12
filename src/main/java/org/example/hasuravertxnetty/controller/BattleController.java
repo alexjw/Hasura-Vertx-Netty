@@ -12,6 +12,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
+import org.example.hasuravertxnetty.models.Battle;
+import org.example.hasuravertxnetty.models.BattleParticipant;
 import org.example.hasuravertxnetty.models.Player;
 import org.example.hasuravertxnetty.repositories.PlayerRepository;
 import org.example.hasuravertxnetty.services.BattleService;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -58,14 +61,15 @@ public class BattleController {
 
     @PostMapping("/start")
     public String startBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
-        logger.info("Starting 16v16 battle simulation");
+        int matchSize = 32;
+        logger.info("Starting battle simulation with {} players", matchSize);
         Integer id = (Integer) ((Map<String, Object>)((Map<String, Object>)((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
         List<Player> players;
 
         synchronized(this) {
             players = playerService.fetchPlayersForBattle();
 
-            if (players.size() < 32) {
+            if (players.size() < matchSize) {
                 logger.warn("Not enough players: found {}", players.size());
                 return "Insufficient players";
             }
@@ -74,14 +78,15 @@ public class BattleController {
             playerService.saveAll(players);
         }
 
-        CountDownLatch latch = new CountDownLatch(32);
+        CountDownLatch latch = new CountDownLatch(players.size());
 
 
 
-        for (int i = 1; i <= 32; i++) {
+        for (Player player : players) {
             new Thread(() -> {
                 EventLoopGroup group = new NioEventLoopGroup();
                 try {
+                    Thread.sleep(Math.round(Math.random() * 10000));
                     Bootstrap client = new Bootstrap()
                             .group(group)
                             .channel(NioSocketChannel.class)
@@ -94,6 +99,7 @@ public class BattleController {
                     ChannelFuture cf = client.connect("localhost", 8080).sync();
                     cf.channel().writeAndFlush("Player" + Thread.currentThread().getId());
                     cf.channel().closeFuture().addListener(future -> latch.countDown());
+                    logger.info("Player {} connected", player.getUsername());
                 } catch (Exception e) {
                     logger.error("Client connection failed", e);
                 } finally {
@@ -103,9 +109,24 @@ public class BattleController {
         }
 
         latch.await();
+        Battle theBattle = battleService.findBattleById(id);
+        theBattle.setStartTime(LocalDateTime.now());
+
+        for (int i = 0; i < players.size(); i++) {
+            BattleParticipant battleParticipant = new BattleParticipant();
+            battleParticipant.setBattle(theBattle);
+            battleParticipant.setPlayer(players.get(i));
+            battleParticipant.setTeam(i % 2 == 0 ? "allies" : "axis");
+            battleParticipant.setScore((int) Math.round(Math.random() * 1000));
+            battleService.saveBattleParticipant(battleParticipant);
+        }
+
+        logger.info("Battle simulation started");
+        long duration = Math.round(Math.random() * 10000);
+        Thread.sleep(duration);
         players.forEach(player -> player.setLookingForBattle(true));
         playerService.saveAll(players);
-        logger.info("Battle simulation completed");
+        logger.info("Battle simulation completed in {} ms", duration);
         return "Battle simulation completed";
     }
 }
