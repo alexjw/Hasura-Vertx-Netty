@@ -3,7 +3,7 @@ package org.example.hasuravertxnetty.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import graphql.kickstart.tools.GraphQLQueryResolver;
-import org.example.hasuravertxnetty.Models.UsernameOutput;
+import org.example.hasuravertxnetty.models.UsernameOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

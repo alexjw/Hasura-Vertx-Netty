@@ -1,4 +1,4 @@
-package org.example.hasuravertxnetty.Models;
+package org.example.hasuravertxnetty.models;
 
 // For a custom Resolver, pending
 public class UsernameOutput {

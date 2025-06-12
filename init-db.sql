@@ -46,8 +46,8 @@ CREATE TABLE player_vehicles (
 CREATE TABLE battles (
                          id SERIAL PRIMARY KEY,
                          mode VARCHAR(20) NOT NULL,
-                         start_time TIMESTAMP NOT NULL,
-                         duration INTERVAL
+                         start_time TIMESTAMP NOT NULL DEFAULT now(),
+                         duration BIGINT
 );
 
 CREATE TABLE battle_participants (
@@ -114,8 +114,8 @@ FROM squadrons s
 
 -- Insert sample battles
 INSERT INTO battles (mode, start_time, duration) VALUES
-                                                     ('arcade', '2025-06-10 14:00:00', '00:15:00'),
-                                                     ('realistic', '2025-06-10 15:00:00', '00:20:00');
+                                                     ('arcade', '2025-06-10 14:00:00', 90000000000),
+                                                     ('realistic', '2025-06-10 15:00:00', 120000000000);
 
 -- Insert sample battle participants
 INSERT INTO battle_participants (battle_id, player_id, team, score) VALUES
