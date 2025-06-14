@@ -46,10 +46,6 @@ public class MultiClientSocketNettyExample {
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, String msg) {
                                     System.out.println("Client received: " + msg);
-                                    // Close only on specific message
-                                    if ("Battle ended".equalsIgnoreCase(msg.trim())) {
-                                        ctx.close();
-                                    }
                                 }
 
                                 @Override

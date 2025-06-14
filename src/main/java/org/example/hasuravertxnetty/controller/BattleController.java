@@ -73,6 +73,7 @@ public class BattleController {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         ChannelFuture serverFuture = null;
+        ConcurrentHashMap<Player, Channel> playerChannelMap = new ConcurrentHashMap<>();
 
         try {
             ServerBootstrap bootstrap = new ServerBootstrap()
@@ -103,6 +104,7 @@ public class BattleController {
                                                 player.setLookingForBattle(false);
                                                 playerService.save(player);
                                                 players.add(player);
+                                                playerChannelMap.put(player, ctx.channel());
                                                 logger.info("Player {} with id {} connected", player.getUsername(), player.getId());
                                                 ctx.writeAndFlush("Hello" + player.getUsername() + ", you're connected, waiting for players\n"); // Match ServerSocket protocol
                                             } else {
@@ -139,8 +141,12 @@ public class BattleController {
             // Broadcast battle start to all clients
             for (Channel channel : clientChannels) {
                 channel.writeAndFlush("Battle started\n");
-                channel.close();
+                //channel.close();
             }
+
+            logger.info("Battle simulation started");
+            long duration = Math.round(Math.random() * 10000) + 5000;
+            Thread.sleep(duration);
 
             for (int i = 0; i < players.size(); i++) {
                 BattleParticipant battleParticipant = new BattleParticipant();
@@ -149,12 +155,9 @@ public class BattleController {
                 battleParticipant.setTeam(i % 2 == 0 ? "allies" : "axis");
                 battleParticipant.setScore((int) Math.round(Math.random() * 1000));
                 battleService.saveBattleParticipant(battleParticipant);
+
+                playerChannelMap.get(players.get(i)).writeAndFlush("Your score (" + players.get(i).getUsername() + ") is " + battleParticipant.getScore() + "\n");
             }
-
-
-            logger.info("Battle simulation started");
-            long duration = Math.round(Math.random() * 10000) + 5000;
-            Thread.sleep(duration);
 
             // Broadcast battle end to all clients
             for (Channel channel : clientChannels) {
