@@ -21,4 +21,12 @@ public class PlayerService {
     public void saveAll(List<Player> players) {
         playerRepository.saveAll(players);
     }
+
+    public void save(Player player) {
+        playerRepository.save(player);
+    }
+
+    public Player findRandomPlayerByIdRange(int i, int i1) {
+        return playerRepository.findById((int) Math.round(Math.random() * (i1 - i) + i)).orElse(null);
+    }
 }

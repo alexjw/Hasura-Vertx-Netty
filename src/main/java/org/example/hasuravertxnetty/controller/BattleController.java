@@ -1,15 +1,10 @@
 package org.example.hasuravertxnetty.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 import org.example.hasuravertxnetty.models.Battle;
@@ -30,6 +25,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
 @RestController
@@ -60,14 +57,20 @@ public class BattleController {
 
 
     @PostMapping("/start")
-    public String startBattle2(@RequestBody Map<String, Object> input) throws InterruptedException {
+    public String startBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
         int matchSize = 32;
         logger.info("Starting battle simulation with {} players", matchSize);
         Integer id = (Integer) ((Map<String, Object>)((Map<String, Object>)((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
-        List<Player> players = new ArrayList<>();
 
+        List<Player> players = new ArrayList<>();
+        Set<Channel> clientChannels = ConcurrentHashMap.newKeySet();
+        CountDownLatch latch = new CountDownLatch(matchSize);
+
+        // Start Netty server
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
+        ChannelFuture serverFuture = null;
+
         try {
             ServerBootstrap bootstrap = new ServerBootstrap()
                     .group(bossGroup, workerGroup)
@@ -75,105 +78,93 @@ public class BattleController {
                     .childHandler(new ChannelInitializer<Channel>() {
                         @Override
                         protected void initChannel(Channel ch) {
+                            ch.pipeline().addLast(new StringDecoder());
                             ch.pipeline().addLast(new StringEncoder());
-                            System.out.println("Received: " + ch.toString());
-                            ch.writeAndFlush("Hello"); // Non-blocking
+
+                            ch.pipeline().addLast(new SimpleChannelInboundHandler<String>() {
+                                @Override
+                                public void channelActive(ChannelHandlerContext context) {
+                                    // Assign random player
+                                    synchronized (players) {
+                                        Player player = playerService.findRandomPlayerByIdRange(1, 50);
+                                        if (player != null && !players.contains(player)) {
+                                            player.setLookingForBattle(false);
+                                            playerService.save(player);
+                                            players.add(player);
+                                            clientChannels.add(context.channel());
+                                            //context.writeAndFlush("Hello\n"); // Match ServerSocket protocol
+                                            logger.info("Player {} connected", player.getUsername());
+                                        } else {
+                                            logger.warn("No unique player found, closing connection");
+                                            context.close();
+                                            latch.countDown();
+                                        }
+                                    }
+                                }
+
+                                @Override
+                                protected void channelRead0(ChannelHandlerContext ctx, String msg) {
+                                    logger.info("Received: {}", msg);
+                                    latch.countDown(); // Signal player connection
+                                }
+
+                                @Override
+                                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+                                    logger.error("Server error: {}", cause.getMessage());
+                                    ctx.close();
+                                    latch.countDown();
+                                }
+                            });
+                            //ch.writeAndFlush("Hello"); // Non-blocking
                         }
                     });
-            bootstrap.bind(8089).sync().channel().closeFuture().sync();
+
+            // Reference for later operations
+            serverFuture = bootstrap.bind(8089).sync();
+
+            // Wait for 32 players to connect
+            latch.await();
+
+            // Start battle
+            Battle theBattle = battleService.findBattleById(id);
+            theBattle.setStartTime(LocalDateTime.now());
+            battleService.save(theBattle);
+
+            for (int i = 0; i < players.size(); i++) {
+                BattleParticipant battleParticipant = new BattleParticipant();
+                battleParticipant.setBattle(theBattle);
+                battleParticipant.setPlayer(players.get(i));
+                battleParticipant.setTeam(i % 2 == 0 ? "allies" : "axis");
+                battleParticipant.setScore((int) Math.round(Math.random() * 1000));
+                battleService.saveBattleParticipant(battleParticipant);
+            }
+
+
+            logger.info("Battle simulation started");
+            long duration = Math.round(Math.random() * 10000);
+            Thread.sleep(duration);
+
+            // Broadcast battle end to all clients
+            for (Channel channel : clientChannels) {
+                channel.writeAndFlush("Battle ended\n");
+                channel.close();
+            }
+
+            players.forEach(player -> player.setLookingForBattle(true));
+            playerService.saveAll(players);
+
+
+            logger.info("Battle simulation completed in {} ms", duration);
+            return "Battle simulation completed";
+
         } finally {
+            if (serverFuture != null) {
+                serverFuture.channel().close().sync();
+            }
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
         }
 
 
-        Battle theBattle = battleService.findBattleById(id);
-        theBattle.setStartTime(LocalDateTime.now());
-
-        for (int i = 0; i < players.size(); i++) {
-            BattleParticipant battleParticipant = new BattleParticipant();
-            battleParticipant.setBattle(theBattle);
-            battleParticipant.setPlayer(players.get(i));
-            battleParticipant.setTeam(i % 2 == 0 ? "allies" : "axis");
-            battleParticipant.setScore((int) Math.round(Math.random() * 1000));
-            battleService.saveBattleParticipant(battleParticipant);
-        }
-
-        logger.info("Battle simulation started");
-        long duration = Math.round(Math.random() * 10000);
-        Thread.sleep(duration);
-        players.forEach(player -> player.setLookingForBattle(true));
-        playerService.saveAll(players);
-        logger.info("Battle simulation completed in {} ms", duration);
-        return "Battle simulation completed";
-    }
-    public String startBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
-        int matchSize = 32;
-        logger.info("Starting battle simulation with {} players", matchSize);
-        Integer id = (Integer) ((Map<String, Object>)((Map<String, Object>)((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
-        List<Player> players;
-
-        synchronized(this) {
-            players = playerService.fetchPlayersForBattle();
-
-            if (players.size() < matchSize) {
-                logger.warn("Not enough players: found {}", players.size());
-                return "Insufficient players";
-            }
-
-            players.forEach(player -> player.setLookingForBattle(false));
-            playerService.saveAll(players);
-        }
-
-        CountDownLatch latch = new CountDownLatch(players.size());
-
-
-
-        for (Player player : players) {
-            new Thread(() -> {
-                EventLoopGroup group = new NioEventLoopGroup();
-                try {
-                    //Thread.sleep(Math.round(Math.random() * 10000));
-                    Bootstrap client = new Bootstrap()
-                            .group(group)
-                            .channel(NioSocketChannel.class)
-                            .handler(new ChannelInitializer<Channel>() {
-                                @Override
-                                protected void initChannel(Channel ch) {
-                                    ch.pipeline().addLast(new StringEncoder(), new StringDecoder());
-                                }
-                            });
-                    ChannelFuture cf = client.connect("localhost", 8080).sync();
-                    cf.channel().writeAndFlush("Player" + Thread.currentThread().getId());
-                    cf.channel().closeFuture().addListener(future -> latch.countDown());
-                    logger.info("Player {} connected", player.getUsername());
-                } catch (Exception e) {
-                    logger.error("Client connection failed", e);
-                } finally {
-                    group.shutdownGracefully();
-                }
-            }).start();
-        }
-
-        latch.await();
-        Battle theBattle = battleService.findBattleById(id);
-        theBattle.setStartTime(LocalDateTime.now());
-
-        for (int i = 0; i < players.size(); i++) {
-            BattleParticipant battleParticipant = new BattleParticipant();
-            battleParticipant.setBattle(theBattle);
-            battleParticipant.setPlayer(players.get(i));
-            battleParticipant.setTeam(i % 2 == 0 ? "allies" : "axis");
-            battleParticipant.setScore((int) Math.round(Math.random() * 1000));
-            battleService.saveBattleParticipant(battleParticipant);
-        }
-
-        logger.info("Battle simulation started");
-        long duration = Math.round(Math.random() * 10000);
-        Thread.sleep(duration);
-        players.forEach(player -> player.setLookingForBattle(true));
-        playerService.saveAll(players);
-        logger.info("Battle simulation completed in {} ms", duration);
-        return "Battle simulation completed";
     }
 }
