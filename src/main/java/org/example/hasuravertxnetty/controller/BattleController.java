@@ -44,6 +44,7 @@ public class BattleController {
     private final PlayerService playerService;
     private final BattleService battleService;
     private static final Pattern PLAYER_ID_PATTERN = Pattern.compile("--(\\d+)--");
+    public static final int MATCH_SIZE = 32;
 
 
     public BattleController(RestClient.Builder restClientBuilder, ObjectMapper objectMapper,
@@ -61,13 +62,12 @@ public class BattleController {
 
     @PostMapping("/start")
     public String startBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
-        int matchSize = 5;
-        logger.info("Starting battle simulation with {} players", matchSize);
+        logger.info("Starting battle simulation with {} players", MATCH_SIZE);
         Integer id = (Integer) ((Map<String, Object>)((Map<String, Object>)((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
 
         List<Player> players = new ArrayList<>();
         Set<Channel> clientChannels = ConcurrentHashMap.newKeySet();
-        CountDownLatch latch = new CountDownLatch(matchSize);
+        CountDownLatch latch = new CountDownLatch(MATCH_SIZE);
 
         // Start Netty server
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
@@ -88,7 +88,6 @@ public class BattleController {
                                 @Override
                                 public void channelActive(ChannelHandlerContext context) {
                                     clientChannels.add(context.channel());
-                                    context.writeAndFlush("Hello, you're connected, waiting for players\n"); // Match ServerSocket protocol
                                 }
 
                                 @Override
@@ -105,6 +104,7 @@ public class BattleController {
                                                 playerService.save(player);
                                                 players.add(player);
                                                 logger.info("Player {} with id {} connected", player.getUsername(), player.getId());
+                                                ctx.writeAndFlush("Hello" + player.getUsername() + ", you're connected, waiting for players\n"); // Match ServerSocket protocol
                                             } else {
                                                 logger.warn("No unique player found, closing connection");
                                                 latch.countDown();
@@ -135,6 +135,12 @@ public class BattleController {
             Battle theBattle = battleService.findBattleById(id);
             theBattle.setStartTime(LocalDateTime.now());
             battleService.save(theBattle);
+
+            // Broadcast battle start to all clients
+            for (Channel channel : clientChannels) {
+                channel.writeAndFlush("Battle started\n");
+                channel.close();
+            }
 
             for (int i = 0; i < players.size(); i++) {
                 BattleParticipant battleParticipant = new BattleParticipant();

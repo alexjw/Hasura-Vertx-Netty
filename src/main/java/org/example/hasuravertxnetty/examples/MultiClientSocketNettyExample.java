@@ -6,6 +6,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
+import org.example.hasuravertxnetty.controller.BattleController;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -17,7 +18,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class MultiClientSocketNettyExample {
     private static final String HOST = "localhost";
     private static final int PORT = 8089;
-    private static final int NUM_CLIENTS = 5;
+    private static final int NUM_CLIENTS = BattleController.MATCH_SIZE;
 
     public static void main(String[] args) throws InterruptedException {
         EventLoopGroup group = new NioEventLoopGroup();
