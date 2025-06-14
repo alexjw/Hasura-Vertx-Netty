@@ -8,16 +8,28 @@ import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MultiClientSocketNettyExample {
     private static final String HOST = "localhost";
     private static final int PORT = 8089;
-    private static final int NUM_CLIENTS = 32;
+    private static final int NUM_CLIENTS = 5;
 
     public static void main(String[] args) throws InterruptedException {
         EventLoopGroup group = new NioEventLoopGroup();
         List<ChannelFuture> futures = new ArrayList<>();
+
+        // Generate 32 unique numbers (1-50) and add to queue, concurrentLikedQueue is thread-safe
+        ConcurrentLinkedQueue<Integer> numberQueue = new ConcurrentLinkedQueue<>();
+        Set<Integer> numbers = new HashSet<>();
+        while (numbers.size() < NUM_CLIENTS) {
+            numbers.add(ThreadLocalRandom.current().nextInt(1, 51));
+        }
+        numberQueue.addAll(numbers);
 
         try {
             Bootstrap bootstrap = new Bootstrap()
@@ -33,12 +45,20 @@ public class MultiClientSocketNettyExample {
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, String msg) {
                                     System.out.println("Client received: " + msg);
-                                    ctx.close(); // Close channel after receiving message
+                                    // Close only on specific message
+                                    if ("Battle ended".equalsIgnoreCase(msg.trim())) {
+                                        ctx.close();
+                                    }
                                 }
 
                                 @Override
                                 public void channelActive(ChannelHandlerContext ctx) {
-                                    ctx.writeAndFlush("Hello from client " + ctx.channel().id());
+                                    String clientId = ctx.channel().id().asShortText();
+                                    Integer number = numberQueue.poll();
+
+                                    ctx.writeAndFlush("Hello from client " + clientId + ": --" + number + "--\n");
+                                    System.out.println("Client " + clientId + " sent: " + number);
+
                                 }
                             });
                         }

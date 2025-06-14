@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/battle")
@@ -41,6 +43,7 @@ public class BattleController {
 
     private final PlayerService playerService;
     private final BattleService battleService;
+    private static final Pattern PLAYER_ID_PATTERN = Pattern.compile("--(\\d+)--");
 
 
     public BattleController(RestClient.Builder restClientBuilder, ObjectMapper objectMapper,
@@ -58,7 +61,7 @@ public class BattleController {
 
     @PostMapping("/start")
     public String startBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
-        int matchSize = 32;
+        int matchSize = 5;
         logger.info("Starting battle simulation with {} players", matchSize);
         Integer id = (Integer) ((Map<String, Object>)((Map<String, Object>)((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
 
@@ -84,27 +87,30 @@ public class BattleController {
                             ch.pipeline().addLast(new SimpleChannelInboundHandler<String>() {
                                 @Override
                                 public void channelActive(ChannelHandlerContext context) {
-                                    // Assign random player
-                                    synchronized (players) {
-                                        Player player = playerService.findRandomPlayerByIdRange(1, 50);
-                                        if (player != null && !players.contains(player)) {
-                                            player.setLookingForBattle(false);
-                                            playerService.save(player);
-                                            players.add(player);
-                                            clientChannels.add(context.channel());
-                                            //context.writeAndFlush("Hello\n"); // Match ServerSocket protocol
-                                            logger.info("Player {} connected", player.getUsername());
-                                        } else {
-                                            logger.warn("No unique player found, closing connection");
-                                            context.close();
-                                            latch.countDown();
-                                        }
-                                    }
+                                    clientChannels.add(context.channel());
+                                    context.writeAndFlush("Hello, you're connected, waiting for players\n"); // Match ServerSocket protocol
                                 }
 
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, String msg) {
+                                    Matcher matcher = PLAYER_ID_PATTERN.matcher(msg);
                                     logger.info("Received: {}", msg);
+                                    if (matcher.find()) {
+                                        // Assign random player
+                                        synchronized (players) {
+                                            int id = Integer.parseInt(matcher.group(1));
+                                            Player player = playerService.findById(id);
+                                            if (player != null && !players.contains(player)) {
+                                                player.setLookingForBattle(false);
+                                                playerService.save(player);
+                                                players.add(player);
+                                                logger.info("Player {} with id {} connected", player.getUsername(), player.getId());
+                                            } else {
+                                                logger.warn("No unique player found, closing connection");
+                                                latch.countDown();
+                                            }
+                                        }
+                                    }
                                     latch.countDown(); // Signal player connection
                                 }
 
@@ -141,7 +147,7 @@ public class BattleController {
 
 
             logger.info("Battle simulation started");
-            long duration = Math.round(Math.random() * 10000);
+            long duration = Math.round(Math.random() * 10000) + 5000;
             Thread.sleep(duration);
 
             // Broadcast battle end to all clients

@@ -26,7 +26,7 @@ public class PlayerService {
         playerRepository.save(player);
     }
 
-    public Player findRandomPlayerByIdRange(int i, int i1) {
-        return playerRepository.findById((int) Math.round(Math.random() * (i1 - i) + i)).orElse(null);
+    public Player findById(int id) {
+        return playerRepository.findById(id).orElse(null);
     }
 }
