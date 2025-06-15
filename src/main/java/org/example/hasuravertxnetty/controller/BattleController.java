@@ -101,8 +101,6 @@ public class BattleController {
                                             int id = Integer.parseInt(matcher.group(1));
                                             Player player = playerService.findById(id);
                                             if (player != null && !players.contains(player)) {
-                                                player.setLookingForBattle(false);
-                                                playerService.save(player);
                                                 players.add(player);
                                                 playerChannelMap.put(player, ctx.channel());
                                                 logger.info("Player {} with id {} connected", player.getUsername(), player.getId());
@@ -164,9 +162,6 @@ public class BattleController {
                 channel.writeAndFlush("Battle ended\n");
                 channel.close();
             }
-
-            players.forEach(player -> player.setLookingForBattle(true));
-            playerService.saveAll(players);
 
 
             logger.info("Battle simulation completed in {} ms", duration);
