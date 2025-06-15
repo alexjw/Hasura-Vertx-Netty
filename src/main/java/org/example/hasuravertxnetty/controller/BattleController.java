@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -144,7 +146,21 @@ public class BattleController {
 
             logger.info("Battle simulation started");
             long duration = Math.round(Math.random() * 10000) + 5000;
-            Thread.sleep(duration);
+
+            // Event Loop telling players that they are still in battle
+            EventLoop eventLoop = workerGroup.next(); // Get an event loop from workerGroup
+            ScheduledFuture<?> battleUpdateTask = eventLoop.scheduleAtFixedRate(() -> {
+                for (Channel channel : clientChannels) {
+                    channel.writeAndFlush("You're in Battle!\n");
+                }
+                logger.info("Sent 'You're in Battle!' to all players");
+            }, 0, 1000, TimeUnit.MILLISECONDS);
+
+
+            Thread.sleep(duration); // Simulate battle
+
+            // Battle ended
+            battleUpdateTask.cancel(true);
 
             for (int i = 0; i < players.size(); i++) {
                 BattleParticipant battleParticipant = new BattleParticipant();
