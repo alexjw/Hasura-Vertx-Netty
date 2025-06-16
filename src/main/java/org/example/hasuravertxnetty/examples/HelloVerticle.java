@@ -15,19 +15,30 @@ public class HelloVerticle extends AbstractVerticle {
         server.requestHandler(request -> {
             // Send a response
             String path = request.path(); // Get the requested path
+
+            String name = request.getParam("name");
+            String message = "Hello, ";
+
+            // Customize the response based on the parameter
+            if (name != null) {
+                message += name + "!";
+            } else {
+                message += "anonymous user!";
+            }
+
             if ("/hello".equals(path)) {
                 request.response()
                         .putHeader("content-type", "text/plain")
-                        .end("Hello from /hello!");
+                        .end(message + " from /hello!");
             } else if ("/goodbye".equals(path)) {
                 request.response()
                         .putHeader("content-type", "text/plain")
-                        .end("Goodbye from /goodbye!");
+                        .end(message + " from /goodbye!");
             } else {
                 request.response()
                         .setStatusCode(404)
                         .putHeader("content-type", "text/plain")
-                        .end("Page not found");
+                        .end(message);
             }
         });
 
