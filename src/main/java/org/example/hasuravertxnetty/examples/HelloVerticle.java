@@ -26,11 +26,18 @@ public class HelloVerticle extends AbstractVerticle {
                 message += "anonymous user!";
             }
 
-            if ("/hello".equals(path)) {
+            if ("/".equals(path)) {
+                request.response()
+                        .setStatusCode(200) // Redundant
+                        .putHeader("content-type", "text/plain")
+                        .end(message);
+            }
+            else if ("/hello".equals(path)) {
                 request.response()
                         .putHeader("content-type", "text/plain")
                         .end(message + " from /hello!");
-            } else if ("/goodbye".equals(path)) {
+            }
+            else if ("/goodbye".equals(path)) {
                 request.response()
                         .putHeader("content-type", "text/plain")
                         .end(message + " from /goodbye!");
@@ -38,7 +45,7 @@ public class HelloVerticle extends AbstractVerticle {
                 request.response()
                         .setStatusCode(404)
                         .putHeader("content-type", "text/plain")
-                        .end(message);
+                        .end("Page not found");
             }
         });
 
