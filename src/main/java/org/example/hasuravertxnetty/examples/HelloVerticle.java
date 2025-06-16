@@ -14,9 +14,21 @@ public class HelloVerticle extends AbstractVerticle {
         // Handle requests
         server.requestHandler(request -> {
             // Send a response
-            request.response()
-                    .putHeader("content-type", "text/plain")
-                    .end("Hello, this is a Vert.x server!");
+            String path = request.path(); // Get the requested path
+            if ("/hello".equals(path)) {
+                request.response()
+                        .putHeader("content-type", "text/plain")
+                        .end("Hello from /hello!");
+            } else if ("/goodbye".equals(path)) {
+                request.response()
+                        .putHeader("content-type", "text/plain")
+                        .end("Goodbye from /goodbye!");
+            } else {
+                request.response()
+                        .setStatusCode(404)
+                        .putHeader("content-type", "text/plain")
+                        .end("Page not found");
+            }
         });
 
         // Start the server on port 8088
