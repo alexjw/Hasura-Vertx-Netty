@@ -16,13 +16,17 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MultiClientSocketNettyExample {
+    private static final String NETTY = "Netty";
+    private static final String VERTX = "Vert.x";
+    private static final String SERVER = VERTX;
     private static final String HOST = "localhost";
-    private static final int PORT = 8089;
+    private static final int PORT = VERTX.equals(SERVER) ? 8088 : 8089;   // 8089 for Netty, 8088 for Vertx
     private static final int NUM_CLIENTS = BattleController.MATCH_SIZE;
 
     public static void main(String[] args) throws InterruptedException {
         EventLoopGroup group = new NioEventLoopGroup();
         List<ChannelFuture> futures = new ArrayList<>();
+        System.out.println("Starting " + SERVER + " server on " + HOST + ":" + PORT);
 
         // Generate 32 unique numbers (1-50) and add to queue, concurrentLikedQueue is thread-safe
         ConcurrentLinkedQueue<Integer> numberQueue = new ConcurrentLinkedQueue<>();
@@ -54,7 +58,8 @@ public class MultiClientSocketNettyExample {
                                     Integer number = numberQueue.poll();
 
                                     ctx.writeAndFlush("Hello from client " + clientId + ": --" + number + "--\n");
-                                    System.out.println("Client " + clientId + " sent: " + number);
+                                    //System.out.println("Client " + clientId + " sent: " + number);
+
 
                                 }
                             });
