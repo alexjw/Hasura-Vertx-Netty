@@ -7,9 +7,9 @@ public class HelloVerticle extends AbstractVerticle {
 
     @Override
     public void start() {
-        // This runs when the verticle starts
+        System.out.println("Started on thread: " + Thread.currentThread().getName());
         vertx.setPeriodic(1000, id -> {
-            System.out.println("Hello from Vert.x!");
+            System.out.println("Task on thread: " + Thread.currentThread().getName());
         });
     }
 
