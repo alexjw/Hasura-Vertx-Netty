@@ -2,14 +2,30 @@ package org.example.hasuravertxnetty.examples;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpServer;
 
 public class HelloVerticle extends AbstractVerticle {
 
     @Override
     public void start() {
-        System.out.println("Started on thread: " + Thread.currentThread().getName());
-        vertx.setPeriodic(1000, id -> {
-            System.out.println("Task on thread: " + Thread.currentThread().getName());
+        // Create an HTTP server
+        HttpServer server = vertx.createHttpServer();
+
+        // Handle requests
+        server.requestHandler(request -> {
+            // Send a response
+            request.response()
+                    .putHeader("content-type", "text/plain")
+                    .end("Hello, this is a Vert.x server!");
+        });
+
+        // Start the server on port 8088
+        server.listen(8088, res -> {
+            if (res.succeeded()) {
+                System.out.println("Server is listening on port 8080");
+            } else {
+                System.out.println("Failed to start server: " + res.cause());
+            }
         });
     }
 
