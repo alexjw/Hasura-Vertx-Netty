@@ -109,7 +109,6 @@ public class BattleController {
                                                 ctx.writeAndFlush("Hello" + player.getUsername() + ", you're connected, waiting for players\n"); // Match ServerSocket protocol
                                             } else {
                                                 logger.warn("No unique player found, closing connection");
-                                                latch.countDown();
                                             }
                                         }
                                     }

@@ -5,6 +5,7 @@ import io.vertx.core.buffer.Buffer;
 import io.vertx.core.net.NetServer;
 import io.vertx.core.net.NetServerOptions;
 import io.vertx.core.net.NetSocket;
+import org.example.hasuravertxnetty.models.Battle;
 import org.example.hasuravertxnetty.models.Player;
 import org.example.hasuravertxnetty.services.BattleService;
 import org.example.hasuravertxnetty.services.PlayerService;
@@ -15,11 +16,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,13 +49,15 @@ public class BattleControllerVertx {
     }
 
     @PostMapping("/start")
-    public String startVertxBattle(@RequestBody Map<String, Object> input) {
+    public String startVertxBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
         logger.info("Starting Vert.x battle simulation with {} players", MATCH_SIZE);
-        Integer battleId = (Integer) ((Map<String, Object>) ((Map<String, Object>) ((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
+        Integer id = (Integer) ((Map<String, Object>) ((Map<String, Object>) ((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
 
         AtomicInteger connectedPlayers = new AtomicInteger(0);
         List<Player> players = new ArrayList<>();
-        Set<NetSocket> clientChannels = ConcurrentHashMap.newKeySet();
+        Set<NetSocket> clientChannels = ConcurrentHashMap.newKeySet();// Initialize CountDownLatch for 32 players
+        CountDownLatch latch = new CountDownLatch(MATCH_SIZE);
+
         ConcurrentHashMap<Player, NetSocket> playerChannelMap = new ConcurrentHashMap<>();
 
         // Start the TCP server
@@ -63,10 +68,7 @@ public class BattleControllerVertx {
             clientChannels.add(socket);
             connectedPlayers.incrementAndGet();
 
-            // Send initial request for player ID
-            socket.write(Buffer.buffer("Please send your player ID in format --ID--\n"));
-            System.out.println("Sent initial request: Please send your player ID in format --ID--");
-
+            // Main Handler
             socket.handler(buffer -> {
                 String message = buffer.toString();
                 System.out.println("Received from client: " + message);
@@ -88,17 +90,16 @@ public class BattleControllerVertx {
                     System.out.println("Invalid player ID format, closing connection");
                     socket.close();
                 }
+                latch.countDown();
             });
 
-            // Send a welcome message immediately
-            socket.write(Buffer.buffer("Welcome to the TCP server!\n"));
-            socket.handler(buffer -> {
-                String message = buffer.toString();
-                System.out.println("Received from client: " + message);
-                socket.write(Buffer.buffer("Hello from server: " + message));
-            });
+
+
             socket.closeHandler(v -> {
                 System.out.println("A raw socket client disconnected!");
+                clientChannels.remove(socket);
+                connectedPlayers.decrementAndGet();
+                playerChannelMap.entrySet().removeIf(entry -> entry.getValue() == socket);
             });
         });
 
@@ -109,6 +110,22 @@ public class BattleControllerVertx {
                 System.out.println("Failed to start TCP server: " + res.cause());
             }
         });
+
+        // Wait for 32 players to connect
+        latch.await();
+
+        // Start battle
+        Battle theBattle = battleService.findBattleById(id);
+        theBattle.setStartTime(LocalDateTime.now());
+        battleService.save(theBattle);
+
+        // Broadcast battle start (initial step)
+        for (NetSocket clientChannel : clientChannels) {
+            clientChannel.write(Buffer.buffer("Battle started!\n"));
+        }
+
+        logger.info("Battle simulation started");
+        long duration = Math.round(Math.random() * 10000) + 5000;
 
         return "";
     }
