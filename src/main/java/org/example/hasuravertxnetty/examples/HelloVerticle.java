@@ -53,7 +53,7 @@ public class HelloVerticle extends AbstractVerticle {
         });
 
         // Add a TCP server for raw socket connections
-        NetServerOptions options = new NetServerOptions().setPort(8087);
+        NetServerOptions options = new NetServerOptions().setPort(8089);
         NetServer tcpServer = vertx.createNetServer(options);
         tcpServer.connectHandler(socket -> {
             System.out.println("A raw socket client connected!");
@@ -77,7 +77,7 @@ public class HelloVerticle extends AbstractVerticle {
             }
         });
 
-        httpServer.webSocketHandler(webSocket -> {
+        /*httpServer.webSocketHandler(webSocket -> {
             // This runs when a client connects
             System.out.println("A client connected!");
             webSocket.writeTextMessage("Welcome to the Vert.x WebSocket server!");
@@ -95,7 +95,7 @@ public class HelloVerticle extends AbstractVerticle {
             } else {
                 System.out.println("Failed to start server: " + res.cause());
             }
-        });
+        });*/
     }
 
     public static void main(String[] args) {
