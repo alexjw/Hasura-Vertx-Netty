@@ -6,6 +6,7 @@ import io.vertx.core.net.NetServer;
 import io.vertx.core.net.NetServerOptions;
 import io.vertx.core.net.NetSocket;
 import org.example.hasuravertxnetty.models.Battle;
+import org.example.hasuravertxnetty.models.BattleParticipant;
 import org.example.hasuravertxnetty.models.Player;
 import org.example.hasuravertxnetty.services.BattleService;
 import org.example.hasuravertxnetty.services.PlayerService;
@@ -77,6 +78,7 @@ public class BattleControllerVertx {
                 if (matcher.find()) {
                     int playerId = Integer.parseInt(matcher.group(1));
                     Player player = playerService.findById(playerId);
+                    players.add(player);
                     if (player != null && !playerChannelMap.containsKey(player)) {
                         playerChannelMap.put(player, socket);
                         System.out.println("Player " + player.getUsername() + " with ID " + playerId + " connected");
@@ -117,7 +119,6 @@ public class BattleControllerVertx {
         // Start battle
         Battle theBattle = battleService.findBattleById(id);
         theBattle.setStartTime(LocalDateTime.now());
-        battleService.save(theBattle);
 
         // Broadcast battle start (initial step)
         for (NetSocket clientChannel : clientChannels) {
@@ -127,6 +128,40 @@ public class BattleControllerVertx {
         logger.info("Battle simulation started");
         long duration = Math.round(Math.random() * 10000) + 5000;
 
-        return "";
+        long battleUpdateTaskId = vertx.setPeriodic(1000, id1 -> {
+            for (NetSocket clientChannel : clientChannels) {
+                clientChannel.write(Buffer.buffer("You're in Battle!\n"));
+            }
+            logger.info("Sent 'You're in Battle!' to all players");
+        });
+
+        Thread.sleep(duration);    // Simulate battle duration
+        logger.info("Battle simulation completed in {} ms", duration);
+
+        vertx.cancelTimer(battleUpdateTaskId);
+        theBattle.setDuration(duration);
+        battleService.save(theBattle);
+
+        for (int i = 0; i < players.size(); i++) {
+            BattleParticipant battleParticipant = new BattleParticipant();
+            battleParticipant.setBattle(theBattle);
+            battleParticipant.setPlayer(players.get(i));
+            battleParticipant.setTeam(i % 2 == 0 ? "allies" : "axis");
+            battleParticipant.setScore((int) Math.round(Math.random() * 1000));
+            battleService.saveBattleParticipant(battleParticipant);
+
+            playerChannelMap.get(players.get(i)).write("Your score (" + players.get(i).getUsername() + ") is " + battleParticipant.getScore() + "\n");
+        }
+
+        logger.info("Scores sent to players");
+
+        // Broadcast battle end to all clients
+        for (NetSocket clientChannel : clientChannels) {
+            clientChannel.write(Buffer.buffer("Battle ended\n"));
+            clientChannel.close();
+        }
+        logger.info("End of Battle sent to players");
+
+        return "Battle simulation completed";
     }
 }

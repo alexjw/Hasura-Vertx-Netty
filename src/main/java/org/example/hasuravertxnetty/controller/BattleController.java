@@ -135,7 +135,6 @@ public class BattleController {
             // Start battle
             Battle theBattle = battleService.findBattleById(id);
             theBattle.setStartTime(LocalDateTime.now());
-            battleService.save(theBattle);
 
             // Broadcast battle start to all clients
             for (Channel channel : clientChannels) {
@@ -157,6 +156,9 @@ public class BattleController {
 
 
             Thread.sleep(duration); // Simulate battle
+            logger.info("Battle simulation completed in {} ms", duration);
+            theBattle.setDuration(duration);
+            battleService.save(theBattle);
 
             // Battle ended
             battleUpdateTask.cancel(true);
@@ -172,14 +174,15 @@ public class BattleController {
                 playerChannelMap.get(players.get(i)).writeAndFlush("Your score (" + players.get(i).getUsername() + ") is " + battleParticipant.getScore() + "\n");
             }
 
+            logger.info("Scores sent to players");
+
             // Broadcast battle end to all clients
             for (Channel channel : clientChannels) {
                 channel.writeAndFlush("Battle ended\n");
                 channel.close();
             }
+            logger.info("End of Battle sent to players");
 
-
-            logger.info("Battle simulation completed in {} ms", duration);
             return "Battle simulation completed";
 
         } finally {
