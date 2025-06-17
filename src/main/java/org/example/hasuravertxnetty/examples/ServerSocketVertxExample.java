@@ -7,7 +7,7 @@ import io.vertx.core.http.HttpServer;
 import io.vertx.core.net.NetServer;
 import io.vertx.core.net.NetServerOptions;
 
-public class HelloVerticle extends AbstractVerticle {
+public class ServerSocketVertxExample extends AbstractVerticle {
 
     @Override
     public void start() {
@@ -100,7 +100,7 @@ public class HelloVerticle extends AbstractVerticle {
 
     public static void main(String[] args) {
         Vertx vertx = Vertx.vertx();          // Create a Vert.x instance
-        vertx.deployVerticle(new HelloVerticle()); // Start the verticle
+        vertx.deployVerticle(new ServerSocketVertxExample()); // Start the verticle
     }
 }
 
