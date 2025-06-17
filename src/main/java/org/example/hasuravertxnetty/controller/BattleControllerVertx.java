@@ -65,14 +65,14 @@ public class BattleControllerVertx {
         NetServerOptions options = new NetServerOptions().setPort(8088);
         NetServer tcpServer = vertx.createNetServer(options);
         tcpServer.connectHandler(socket -> {
-            System.out.println("A raw socket client connected!");
+            logger.info("A raw socket client connected!");
             clientChannels.add(socket);
             connectedPlayers.incrementAndGet();
 
             // Main Handler
             socket.handler(buffer -> {
                 String message = buffer.toString();
-                System.out.println("Received from client: " + message);
+                logger.info("Received from client: " + message);
 
                 Matcher matcher = PLAYER_ID_PATTERN.matcher(message);
                 if (matcher.find()) {
@@ -81,16 +81,13 @@ public class BattleControllerVertx {
                     players.add(player);
                     if (player != null && !playerChannelMap.containsKey(player)) {
                         playerChannelMap.put(player, socket);
-                        System.out.println("Player " + player.getUsername() + " with ID " + playerId + " connected");
+                        logger.info("Player " + player.getUsername() + " with ID " + playerId + " connected");
                         socket.write(Buffer.buffer("Hello " + player.getUsername() + ", you're connected, waiting for players\n"));
-                        System.out.println("Sent welcome: Hello " + player.getUsername() + ", you're connected, waiting for players");
+                        logger.info("Sent welcome: Hello " + player.getUsername() + ", you're connected, waiting for players");
                     } else {
-                        System.out.println("No unique player found for ID " + playerId + ", closing connection");
+                        logger.warn("No unique player found for ID " + playerId + ", closing connection");
                         socket.close();
                     }
-                } else {
-                    System.out.println("Invalid player ID format, closing connection");
-                    socket.close();
                 }
                 latch.countDown();
             });
@@ -98,7 +95,7 @@ public class BattleControllerVertx {
 
 
             socket.closeHandler(v -> {
-                System.out.println("A raw socket client disconnected!");
+                logger.info("A raw socket client disconnected!");
                 clientChannels.remove(socket);
                 connectedPlayers.decrementAndGet();
                 playerChannelMap.entrySet().removeIf(entry -> entry.getValue() == socket);
@@ -107,9 +104,9 @@ public class BattleControllerVertx {
 
         tcpServer.listen(res -> {
             if (res.succeeded()) {
-                System.out.println("TCP server is listening on port 8087");
+                logger.info("TCP server is listening on port 8088");
             } else {
-                System.out.println("Failed to start TCP server: " + res.cause());
+                logger.error("Failed to start TCP server: " + res.cause());
             }
         });
 
@@ -161,6 +158,15 @@ public class BattleControllerVertx {
             clientChannel.close();
         }
         logger.info("End of Battle sent to players");
+
+        // Shut down the TCP server
+        tcpServer.close(ar -> {
+            if (ar.succeeded()) {
+                logger.info("TCP server shut down successfully");
+            } else {
+                logger.error("Failed to shut down TCP server: " + ar.cause());
+            }
+        });
 
         return "Battle simulation completed";
     }
