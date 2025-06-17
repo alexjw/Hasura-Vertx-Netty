@@ -2,17 +2,20 @@ package org.example.hasuravertxnetty.examples;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.net.NetServer;
+import io.vertx.core.net.NetServerOptions;
 
 public class HelloVerticle extends AbstractVerticle {
 
     @Override
     public void start() {
         // Create an HTTP server
-        HttpServer server = vertx.createHttpServer();
+        HttpServer httpServer = vertx.createHttpServer();
 
         // Handle requests
-        server.requestHandler(request -> {
+        httpServer.requestHandler(request -> {
             // Send a response
             String path = request.path(); // Get the requested path
 
@@ -49,10 +52,46 @@ public class HelloVerticle extends AbstractVerticle {
             }
         });
 
-        // Start the server on port 8088
-        server.listen(8088, res -> {
+        // Add a TCP server for raw socket connections
+        NetServerOptions options = new NetServerOptions().setPort(8087);
+        NetServer tcpServer = vertx.createNetServer(options);
+        tcpServer.connectHandler(socket -> {
+            System.out.println("A raw socket client connected!");
+            // Send a welcome message immediately
+            socket.write(Buffer.buffer("Welcome to the TCP server!\n"));
+            socket.handler(buffer -> {
+                String message = buffer.toString();
+                System.out.println("Received from client: " + message);
+                socket.write(Buffer.buffer("Hello from server: " + message));
+            });
+            socket.closeHandler(v -> {
+                System.out.println("A raw socket client disconnected!");
+            });
+        });
+
+        tcpServer.listen(res -> {
             if (res.succeeded()) {
-                System.out.println("Server is listening on port 8080");
+                System.out.println("TCP server is listening on port 8087");
+            } else {
+                System.out.println("Failed to start TCP server: " + res.cause());
+            }
+        });
+
+        httpServer.webSocketHandler(webSocket -> {
+            // This runs when a client connects
+            System.out.println("A client connected!");
+            webSocket.writeTextMessage("Welcome to the Vert.x WebSocket server!");
+
+            // Close the connection when the client disconnects
+            webSocket.closeHandler(v -> {
+                System.out.println("A client disconnected!");
+            });
+        });
+
+        // Start the server on port 8088
+        httpServer.listen(8088, res -> {
+            if (res.succeeded()) {
+                System.out.println("Server is listening on port 8088");
             } else {
                 System.out.println("Failed to start server: " + res.cause());
             }

@@ -8,7 +8,7 @@ import java.net.Socket;
 
 public class ClientSocketExample {
     public static void main(String[] args) throws IOException, InterruptedException {
-        Socket socket = new Socket("localhost", 8089); // Connect to server
+        Socket socket = new Socket("localhost", 8087); // Connect to server
         Thread.sleep(3000);
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
