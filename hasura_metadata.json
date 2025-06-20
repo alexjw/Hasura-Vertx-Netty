@@ -1,5 +1,5 @@
 {
-  "resource_version": 12,
+  "resource_version": 3,
   "metadata": {
     "version": 3,
     "sources": [
@@ -45,6 +45,23 @@
                   }
                 }
               }
+            ],
+            "event_triggers": [
+              {
+                "name": "start_battle",
+                "definition": {
+                  "enable_manual": false,
+                  "insert": {
+                    "columns": "*"
+                  }
+                },
+                "retry_conf": {
+                  "interval_sec": 10,
+                  "num_retries": 0,
+                  "timeout_sec": 60
+                },
+                "webhook": "http://host.docker.internal:8080/battle/start"
+              }
             ]
           },
           {
@@ -52,6 +69,29 @@
               "name": "nations",
               "schema": "public"
             }
+          },
+          {
+            "table": {
+              "name": "player_battle_summary",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "player",
+                "using": {
+                  "manual_configuration": {
+                    "column_mapping": {
+                      "player_id": "id"
+                    },
+                    "insertion_order": null,
+                    "remote_table": {
+                      "name": "players",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ]
           },
           {
             "table": {
@@ -76,6 +116,23 @@
                     }
                   }
                 }
+              }
+            ],
+            "event_triggers": [
+              {
+                "name": "player_insert_webhook",
+                "definition": {
+                  "enable_manual": false,
+                  "update": {
+                    "columns": "*"
+                  }
+                },
+                "retry_conf": {
+                  "interval_sec": 10,
+                  "num_retries": 0,
+                  "timeout_sec": 60
+                },
+                "webhook": "https://alexjw.free.beeceptor.com"
               }
             ]
           },
@@ -142,6 +199,65 @@
           }
         }
       }
-    ]
+    ],
+    "remote_schemas": [
+      {
+        "name": "war-thunder-resolver",
+        "definition": {
+          "url": "http://host.docker.internal:4000/graphql",
+          "timeout_seconds": 60
+        },
+        "comment": "Adds \"Hero\" to username"
+      }
+    ],
+    "actions": [
+      {
+        "name": "calculatePlayerRank",
+        "definition": {
+          "handler": "http://host.docker.internal:8080/api/rank",
+          "output_type": "PlayerRankOutput",
+          "headers": [
+            {
+              "name": "x-hasura-admin-secret",
+              "value": "secret"
+            }
+          ],
+          "arguments": [
+            {
+              "name": "playerId",
+              "type": "Int!"
+            }
+          ],
+          "type": "mutation",
+          "kind": "synchronous"
+        },
+        "comment": "calculatePlayerRank"
+      }
+    ],
+    "custom_types": {
+      "objects": [
+        {
+          "name": "PlayerRankOutput",
+          "fields": [
+            {
+              "name": "playerId",
+              "type": "Int!"
+            },
+            {
+              "name": "username",
+              "type": "String!"
+            },
+            {
+              "name": "totalScore",
+              "type": "Int!"
+            },
+            {
+              "name": "rank",
+              "type": "String!"
+            }
+          ]
+        }
+      ]
+    }
   }
 }
