@@ -57,7 +57,7 @@ public class RankController {
         String rank = calculateRank(totalScore);
 
         // Return output
-        PlayerRankOutput output = new PlayerRankOutput((Integer) input.get("playerId"), username, totalScore, rank);
+        PlayerRankOutput output = new PlayerRankOutput((Integer) ((Map<Object, Object>)input.get("input")).get("playerId"), username, totalScore, rank);
         return ResponseEntity.ok(output);
     }
 
