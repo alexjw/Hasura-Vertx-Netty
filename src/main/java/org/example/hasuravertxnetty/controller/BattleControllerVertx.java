@@ -1,5 +1,7 @@
 package org.example.hasuravertxnetty.controller;
 
+import dev.failsafe.Failsafe;
+import dev.failsafe.RetryPolicy;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.net.NetServer;
@@ -39,9 +41,16 @@ public class BattleControllerVertx {
     private static final int MATCH_SIZE = BattleController.MATCH_SIZE;
     private static final Pattern PLAYER_ID_PATTERN = Pattern.compile("--(\\d+)--");
 
-    public BattleControllerVertx(PlayerService playerService, BattleService battleService) {
+    private final RetryPolicy<Object> playerServiceRetryPolicy;
+    private final RetryPolicy<Object> battleServiceRetryPolicy;
+    private final RetryPolicy<Object> clientMessageRetryPolicy;
+
+    public BattleControllerVertx(PlayerService playerService, BattleService battleService, RetryPolicy<Object> playerServiceRetryPolicy, RetryPolicy<Object> battleServiceRetryPolicy, RetryPolicy<Object> clientMessageRetryPolicy) {
         this.playerService = playerService;
         this.battleService = battleService;
+        this.playerServiceRetryPolicy = playerServiceRetryPolicy;
+        this.battleServiceRetryPolicy = battleServiceRetryPolicy;
+        this.clientMessageRetryPolicy = clientMessageRetryPolicy;
         this.vertx = Vertx.vertx(); // Initialize Vert.x
     }
 
@@ -50,7 +59,7 @@ public class BattleControllerVertx {
     }
 
     @PostMapping("/start")
-    public String startVertxBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
+    public synchronized String startVertxBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
         logger.info("Starting Vert.x battle simulation with {} players", MATCH_SIZE);
         Integer id = (Integer) ((Map<String, Object>) ((Map<String, Object>) ((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
 
@@ -77,12 +86,12 @@ public class BattleControllerVertx {
                 Matcher matcher = PLAYER_ID_PATTERN.matcher(message);
                 if (matcher.find()) {
                     int playerId = Integer.parseInt(matcher.group(1));
-                    Player player = playerService.findById(playerId);
+                    Player player = Failsafe.with(playerServiceRetryPolicy).get(() -> playerService.findById(playerId));
                     players.add(player);
                     if (player != null && !playerChannelMap.containsKey(player)) {
                         playerChannelMap.put(player, socket);
                         logger.info("Player " + player.getUsername() + " with ID " + playerId + " connected");
-                        socket.write(Buffer.buffer("Hello " + player.getUsername() + ", you're connected, waiting for players\n"));
+                        Failsafe.with(clientMessageRetryPolicy).run(() -> socket.write(Buffer.buffer("Hello " + player.getUsername() + ", you're connected, waiting for players\n")));
                         logger.info("Sent welcome: Hello " + player.getUsername() + ", you're connected, waiting for players");
                     } else {
                         logger.warn("No unique player found for ID " + playerId + ", closing connection");
@@ -119,7 +128,7 @@ public class BattleControllerVertx {
 
         // Broadcast battle start (initial step)
         for (NetSocket clientChannel : clientChannels) {
-            clientChannel.write(Buffer.buffer("Battle started!\n"));
+            Failsafe.with(clientMessageRetryPolicy).run(() -> clientChannel.write(Buffer.buffer("Battle started!\n")));
         }
 
         logger.info("Battle simulation started");
@@ -137,24 +146,26 @@ public class BattleControllerVertx {
 
         vertx.cancelTimer(battleUpdateTaskId);
         theBattle.setDuration(duration);
-        battleService.save(theBattle);
+        Failsafe.with(battleServiceRetryPolicy).run(() -> battleService.save(theBattle));
 
         for (int i = 0; i < players.size(); i++) {
             BattleParticipant battleParticipant = new BattleParticipant();
             battleParticipant.setBattle(theBattle);
-            battleParticipant.setPlayer(players.get(i));
+            Player player = players.get(i);
+            battleParticipant.setPlayer(player);
             battleParticipant.setTeam(i % 2 == 0 ? "allies" : "axis");
             battleParticipant.setScore((int) Math.round(Math.random() * 1000));
+            Failsafe.with(battleServiceRetryPolicy).run(() -> battleService.saveBattleParticipant(battleParticipant));
             battleService.saveBattleParticipant(battleParticipant);
 
-            playerChannelMap.get(players.get(i)).write("Your score (" + players.get(i).getUsername() + ") is " + battleParticipant.getScore() + "\n");
+            Failsafe.with(clientMessageRetryPolicy).run(() -> playerChannelMap.get(player).write("Your score (" + player.getUsername() + ") is " + battleParticipant.getScore() + "\n"));
         }
 
         logger.info("Scores sent to players");
 
         // Broadcast battle end to all clients
         for (NetSocket clientChannel : clientChannels) {
-            clientChannel.write(Buffer.buffer("Battle ended\n"));
+            Failsafe.with(clientMessageRetryPolicy).run(() -> clientChannel.write(Buffer.buffer("Battle ended\n")));
             clientChannel.close();
         }
         logger.info("End of Battle sent to players");

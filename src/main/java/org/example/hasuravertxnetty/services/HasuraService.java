@@ -25,7 +25,7 @@ public class HasuraService {
         return restClient.post()
                 .uri(hasuraEndpoint)
                 .header("x-hasura-admin-secret", adminSecret)
-                .body(query3)
+                .body(query)
                 .retrieve()
                 .body(String.class);
     }

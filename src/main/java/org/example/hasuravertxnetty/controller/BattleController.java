@@ -1,6 +1,5 @@
 package org.example.hasuravertxnetty.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -14,12 +13,10 @@ import org.example.hasuravertxnetty.services.BattleService;
 import org.example.hasuravertxnetty.services.PlayerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClient;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -38,24 +35,13 @@ import java.util.regex.Pattern;
 public class BattleController {
     private static final Logger logger = LoggerFactory.getLogger(BattleController.class);
 
-    private final RestClient restClient;
-    private final ObjectMapper objectMapper;
-    private final String hasuraEndpoint;
-    private final String hasuraAdminSecret;
-
     private final PlayerService playerService;
     private final BattleService battleService;
     private static final Pattern PLAYER_ID_PATTERN = Pattern.compile("--(\\d+)--");
     public static final int MATCH_SIZE = 32;
 
 
-    public BattleController(RestClient.Builder restClientBuilder, ObjectMapper objectMapper,
-                            @Value("${hasura.endpoint}") String hasuraEndpoint,
-                            @Value("${hasura.admin-secret}") String hasuraAdminSecret, PlayerService playerService, BattleService battleService) {
-        this.restClient = restClientBuilder.build();
-        this.objectMapper = objectMapper;
-        this.hasuraEndpoint = hasuraEndpoint;
-        this.hasuraAdminSecret = hasuraAdminSecret;
+    public BattleController(PlayerService playerService, BattleService battleService) {
         this.playerService = playerService;
         this.battleService = battleService;
     }
@@ -63,7 +49,7 @@ public class BattleController {
 
 
     @PostMapping("/start")
-    public String startBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
+    public synchronized String startBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
         logger.info("Starting battle simulation with {} players", MATCH_SIZE);
         Integer id = (Integer) ((Map<String, Object>)((Map<String, Object>)((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
 
