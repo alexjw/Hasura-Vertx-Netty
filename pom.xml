@@ -48,6 +48,7 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
+			<version>42.7.7</version>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
@@ -65,7 +66,6 @@
 			<artifactId>spring-graphql-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-
 		<dependency>
 			<groupId>com.graphql-java-kickstart</groupId>
 			<artifactId>playground-spring-boot-starter</artifactId>
@@ -88,7 +88,17 @@
 		<dependency>
 			<groupId>dev.failsafe</groupId>
 			<artifactId>failsafe</artifactId>
-			<version>3.3.2</version> <!-- Replace with the latest version if needed -->
+			<version>3.3.2</version>
+		</dependency>
+		<dependency>
+			<groupId>io.github.resilience4j</groupId>
+			<artifactId>resilience4j-circuitbreaker</artifactId>
+			<version>2.1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>io.github.resilience4j</groupId>
+			<artifactId>resilience4j-retry</artifactId>
+			<version>2.1.0</version>
 		</dependency>
 	</dependencies>
 
