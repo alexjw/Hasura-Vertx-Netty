@@ -1,5 +1,6 @@
 package org.example.hasuravertxnetty.config;
 
+import dev.failsafe.CircuitBreaker;
 import dev.failsafe.RetryPolicy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,6 +37,21 @@ public class FailsafeConfig {
         return RetryPolicy.builder()
                 .handle(IOException.class) // Retry on I/O errors
                 .withMaxRetries(2)
+                .build();
+    }
+
+    /**
+     * CircuitBreaker for network operations (e.g., client messages).
+     * Opens after 3 failures, waits 5s, and requires 1 success to close.
+     */
+    @Bean
+    public CircuitBreaker<Object> networkCircuitBreaker() {
+        return CircuitBreaker.builder()
+                .withFailureThreshold(3, 5) // Open after 3 failures in a window of 5 calls
+                .withSuccessThreshold(1)    // Close after 1 success in half-open state
+                .withDelay(Duration.ofSeconds(5)) // Delay before half-open state
+                .onOpen(e -> System.out.println("CircuitBreaker opened for network"))
+                .onClose(e -> System.out.println("CircuitBreaker closed for network"))
                 .build();
     }
 

@@ -1,5 +1,6 @@
 package org.example.hasuravertxnetty.controller;
 
+import dev.failsafe.CircuitBreaker;
 import dev.failsafe.Failsafe;
 import dev.failsafe.RetryPolicy;
 import io.vertx.core.Vertx;
@@ -44,13 +45,15 @@ public class BattleControllerVertx {
     private final RetryPolicy<Object> playerServiceRetryPolicy;
     private final RetryPolicy<Object> battleServiceRetryPolicy;
     private final RetryPolicy<Object> clientMessageRetryPolicy;
+    private final CircuitBreaker<Object> networkCircuitBreaker;
 
-    public BattleControllerVertx(PlayerService playerService, BattleService battleService, RetryPolicy<Object> playerServiceRetryPolicy, RetryPolicy<Object> battleServiceRetryPolicy, RetryPolicy<Object> clientMessageRetryPolicy) {
+    public BattleControllerVertx(PlayerService playerService, BattleService battleService, RetryPolicy<Object> playerServiceRetryPolicy, RetryPolicy<Object> battleServiceRetryPolicy, RetryPolicy<Object> clientMessageRetryPolicy, CircuitBreaker<Object> networkCircuitBreaker) {
         this.playerService = playerService;
         this.battleService = battleService;
         this.playerServiceRetryPolicy = playerServiceRetryPolicy;
         this.battleServiceRetryPolicy = battleServiceRetryPolicy;
         this.clientMessageRetryPolicy = clientMessageRetryPolicy;
+        this.networkCircuitBreaker = networkCircuitBreaker;
         this.vertx = Vertx.vertx(); // Initialize Vert.x
     }
 
@@ -91,7 +94,10 @@ public class BattleControllerVertx {
                     if (player != null && !playerChannelMap.containsKey(player)) {
                         playerChannelMap.put(player, socket);
                         logger.info("Player " + player.getUsername() + " with ID " + playerId + " connected");
-                        Failsafe.with(clientMessageRetryPolicy).run(() -> socket.write(Buffer.buffer("Hello " + player.getUsername() + ", you're connected, waiting for players\n")));
+                        Failsafe
+                                .with(clientMessageRetryPolicy)
+                                .compose(networkCircuitBreaker)
+                                .run(() -> socket.write(Buffer.buffer("Hello " + player.getUsername() + ", you're connected, waiting for players\n")));
                         logger.info("Sent welcome: Hello " + player.getUsername() + ", you're connected, waiting for players");
                     } else {
                         logger.warn("No unique player found for ID " + playerId + ", closing connection");
@@ -128,7 +134,10 @@ public class BattleControllerVertx {
 
         // Broadcast battle start (initial step)
         for (NetSocket clientChannel : clientChannels) {
-            Failsafe.with(clientMessageRetryPolicy).run(() -> clientChannel.write(Buffer.buffer("Battle started!\n")));
+            Failsafe
+                    .with(clientMessageRetryPolicy)
+                    .compose(networkCircuitBreaker)
+                    .run(() -> clientChannel.write(Buffer.buffer("Battle started!\n")));
         }
 
         logger.info("Battle simulation started");
@@ -158,14 +167,20 @@ public class BattleControllerVertx {
             Failsafe.with(battleServiceRetryPolicy).run(() -> battleService.saveBattleParticipant(battleParticipant));
             battleService.saveBattleParticipant(battleParticipant);
 
-            Failsafe.with(clientMessageRetryPolicy).run(() -> playerChannelMap.get(player).write("Your score (" + player.getUsername() + ") is " + battleParticipant.getScore() + "\n"));
+            Failsafe
+                    .with(clientMessageRetryPolicy)
+                    .compose(networkCircuitBreaker)
+                    .run(() -> playerChannelMap.get(player).write("Your score (" + player.getUsername() + ") is " + battleParticipant.getScore() + "\n"));
         }
 
         logger.info("Scores sent to players");
 
         // Broadcast battle end to all clients
         for (NetSocket clientChannel : clientChannels) {
-            Failsafe.with(clientMessageRetryPolicy).run(() -> clientChannel.write(Buffer.buffer("Battle ended\n")));
+            Failsafe
+                    .with(clientMessageRetryPolicy)
+                    .compose(networkCircuitBreaker)
+                    .run(() -> clientChannel.write(Buffer.buffer("Battle ended\n")));
             clientChannel.close();
         }
         logger.info("End of Battle sent to players");
