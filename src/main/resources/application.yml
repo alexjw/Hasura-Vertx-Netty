@@ -1,0 +1,27 @@
+resilience4j:
+  retry:
+    instances:
+      databaseRetry:
+        maxAttempts: 3
+        waitDuration: 500ms
+        retryExceptions:
+          - java.sql.SQLException
+          - java.io.IOException
+  circuitbreaker:
+    instances:
+      databaseCircuitBreaker:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+  bulkhead:
+    instances:
+      databaseBulkhead:
+        maxConcurrentCalls: 10
+        maxWaitDuration: 500ms
+  ratelimiter:
+    instances:
+      startBattleRateLimiter:
+        limitForPeriod: 1
+        limitRefreshPeriod: 20s
+        timeoutDuration: 100ms

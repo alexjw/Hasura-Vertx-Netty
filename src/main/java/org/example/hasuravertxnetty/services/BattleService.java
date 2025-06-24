@@ -1,5 +1,8 @@
 package org.example.hasuravertxnetty.services;
 
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.example.hasuravertxnetty.models.Battle;
 import org.example.hasuravertxnetty.models.BattleParticipant;
 import org.example.hasuravertxnetty.models.Player;
@@ -42,14 +45,23 @@ public class BattleService {
         return battleRepository.save(battle);
     }
 
+    @Retry(name = "databaseRetry")
+    @CircuitBreaker(name = "databaseCircuitBreaker")
+    @Bulkhead(name = "databaseBulkhead")
     public Battle findBattleById(Integer id) {
         return battleRepository.findById(id).orElse(null);
     }
 
+    @Retry(name = "databaseRetry")
+    @CircuitBreaker(name = "databaseCircuitBreaker")
+    @Bulkhead(name = "databaseBulkhead")
     public void saveBattleParticipant(BattleParticipant battleParticipant) {
         battleParticipantRepository.save(battleParticipant);
     }
 
+    @Retry(name = "databaseRetry")
+    @CircuitBreaker(name = "databaseCircuitBreaker")
+    @Bulkhead(name = "databaseBulkhead")
     public void save(Battle theBattle) {
         battleRepository.save(theBattle);
     }

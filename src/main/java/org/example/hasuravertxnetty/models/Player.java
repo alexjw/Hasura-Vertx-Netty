@@ -2,8 +2,6 @@ package org.example.hasuravertxnetty.models;
 
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
 
 @Entity
 @Table(name = "players")
@@ -18,13 +16,13 @@ public class Player {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Integer id = 0;
 
     @Column(nullable = false, unique = true)
-    private String username;
+    private String username = "";
 
     @Column(nullable = false)
-    private Integer level;
+    private Integer level = 0;
 
     public void setUsername(String username) {
         this.username = username;

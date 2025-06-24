@@ -1,5 +1,6 @@
 package org.example.hasuravertxnetty.controller;
 
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -49,6 +50,7 @@ public class BattleController {
 
 
     @PostMapping("/start")
+    @RateLimiter(name = "startBattleRateLimiter", fallbackMethod = "fallbackStartBattle")   // Prevents too many requests
     public synchronized String startBattle(@RequestBody Map<String, Object> input) throws InterruptedException {
         logger.info("Starting battle simulation with {} players", MATCH_SIZE);
         Integer id = (Integer) ((Map<String, Object>)((Map<String, Object>)((Map<String, Object>) input.get("event")).get("data")).get("new")).get("id");
@@ -180,5 +182,11 @@ public class BattleController {
         }
 
 
+    }
+
+    // Fallback method
+    private String fallbackStartBattle(Map<String, Object> input, Throwable t) {
+        logger.error("Failed to start battle: {}", t.getMessage());
+        return "Battle start failed due to too many requests. Please try again later.";
     }
 }
