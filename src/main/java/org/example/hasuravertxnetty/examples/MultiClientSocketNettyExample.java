@@ -26,7 +26,11 @@ public class MultiClientSocketNettyExample {
     public static void main(String[] args) throws InterruptedException {
         EventLoopGroup group = new NioEventLoopGroup();
         List<ChannelFuture> futures = new ArrayList<>();
-        System.out.println("Starting " + SERVER + " server on " + HOST + ":" + PORT);
+        System.out.println(args[0]);
+        String server = args[0];
+        int port = Integer.parseInt(args[1]);
+        System.out.println(port);
+        System.out.println("Starting " + server + " server on " + HOST + ":" + port);
 
         // Generate 32 unique numbers (1-50) and add to queue, concurrentLikedQueue is thread-safe
         ConcurrentLinkedQueue<Integer> numberQueue = new ConcurrentLinkedQueue<>();
@@ -69,7 +73,7 @@ public class MultiClientSocketNettyExample {
             // Create 32 client connections
             for (int i = 0; i < NUM_CLIENTS; i++) {
                 Thread.sleep(Math.round(Math.random() * 100));
-                ChannelFuture future = bootstrap.connect(HOST, PORT);
+                ChannelFuture future = bootstrap.connect(HOST, port);
                 futures.add(future);
                 int finalI = i;
                 future.addListener((ChannelFutureListener) f -> {
